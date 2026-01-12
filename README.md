@@ -16,6 +16,7 @@ Unlike standard implementations that run in $O(n^2)$ time, this simulation utili
 * **Periodic Boundaries:** The world wraps around (toroidal topology) to prevent edge clumping.
 
 <img width="873" height="534" alt="Screenshot 2026-01-12 115641" src="https://github.com/user-attachments/assets/2e1f6dcc-637d-4960-b905-04c65b7a3373" />
+<img width="499" height="500" alt="Screenshot 2026-01-12 125238" src="https://github.com/user-attachments/assets/d27eebd4-7161-4630-a277-b5afcdfeb9a5" />
 
 ## Installation
 
