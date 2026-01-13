@@ -1,6 +1,10 @@
+from numba.cuda import grid
 import pygame
 import numpy as np
 from numba import njit, prange
+
+# ---------------------------------------------------------------------------------
+# Helper functions
 
 def lerp(start_color, end_color, t):
 
@@ -22,6 +26,9 @@ def draw_button(screen, rect, text, font, bg_color=(100, 100, 100), text_color=(
     text_rect = text.get_rect(center=rect.center)
     
     screen.blit(text, text_rect)
+
+# ---------------------------------------------------------------------------------
+# UI drawing functions
 
 def draw_ui(screen, map_size, sidebar_width, seed_text, input_active, num_types, buffer_clear):
 
@@ -84,6 +91,7 @@ def draw_ui(screen, map_size, sidebar_width, seed_text, input_active, num_types,
     
     # We return the ui_rects but also the y_position so that we can
     # can use it when drawing the interaction buffer
+
     return ui_rects, y_cursor + 60
 
 
@@ -116,14 +124,13 @@ def draw_matrix(screen, matrix, map_size, sidebar_width, particle_colors, start_
 
             # We colour a square green or red depending on
             # the sign of the value
+
             if value >= 0:
                 t = value / MAX_MAG 
                 color = lerp(WHITE, GREEN, t)
             else:
                 t = -value / MAX_MAG
                 color = lerp(RED, WHITE, t)
-
-            
 
             rect = pygame.Rect(
                 matrix_x_offset + i2 * cell_size + cell_margin,
@@ -147,6 +154,8 @@ def draw_matrix(screen, matrix, map_size, sidebar_width, particle_colors, start_
         pygame.draw.circle(screen, particle_colors[i2 % len(particle_colors)], col_dot_center, 5)
 
 
+# ---------------------------------------------------------------------------------
+# Simulation drawing functions (optimized)
 
 @njit(parallel=True, cache=True)
 def draw_particles_fast(pixel_buffer, positions, types, colors, num_colors):
@@ -155,7 +164,6 @@ def draw_particles_fast(pixel_buffer, positions, types, colors, num_colors):
 
     N = len(positions)
  
-   
     for i in prange(N):
         x = positions[i, 0]
         y = positions[i, 1]
@@ -171,10 +179,7 @@ def draw_particles_fast(pixel_buffer, positions, types, colors, num_colors):
         pixel_buffer[y, x, 2] = color[2]
 
 
-        
-       
-
-
+ 
 def draw_simulation(screen, surface, pixel_buffer, positions, types, colors, map_size, buffer_clear, bg_color=(20, 20, 20)):
      
     # The function which optionally clears the screen and then draws all particles to the surface
@@ -182,7 +187,7 @@ def draw_simulation(screen, surface, pixel_buffer, positions, types, colors, map
 
     if (buffer_clear):
         pixel_buffer[:, :] = np.array(bg_color, dtype=np.uint8)
-    
+
     colors_np = np.array(colors, dtype=np.uint8)
     num_colors = len(colors)
     
@@ -196,4 +201,13 @@ def draw_simulation(screen, surface, pixel_buffer, positions, types, colors, map
 
     pygame.surfarray.blit_array(surface, pixel_buffer)
     screen.blit(surface, (0, 0))
-    
+
+
+
+
+
+
+  
+
+
+

@@ -1,222 +1,175 @@
 import numpy as np
-from numba import int16, njit, int32, float64, prange
+from numba import njit, int32, float64, prange
 
+#
 
 @njit(cache=True)
 def calculate_force(dist, R_min, R_max, alpha):
-   
-    # A piece wise function which repels particles which come to close to each other
-    # when between min and max range is like a hill having strongest value in the middle
-    # and weakening towards the real values and outside of that it returns 0. 
-
-    # We use the sinoid version because its smoother then using ABS which creates
-    # a very pointy and pyramid like shape. Off course this is just a preference with
-    # no real value except smoother movement. 
-
+    
+    # Piece-wise function:
+    # - Repels particles if dist < R_min.
+    # - Attracts/Repels if R_min < dist < R_max.
+    # - Returns 0 otherwise.
+    
     if dist < R_min:
-        return alpha * (1 - dist / R_min)
+        return alpha * (1.0 - dist / R_min)
     elif dist < R_max:
+
+        # We use the sinoid version because its smoother then using ABS which creates
+        # a very pointy and pyramid like shape. Off course this is just a preference with
+        # no real value except smoother movement. 
+
         normalized_dist = (dist - R_min) / (R_max - R_min)
         return alpha * np.sin(np.pi * normalized_dist)
     
     return 0.0
 
-@njit(cache=True)
-def map_particles_to_cells(pos, N, cell_size, grid_dim, grid_indices):
-    # Maps all particles indexes to their corresponding grid position
-    for particle_id in range(N):
-      
-        cell_x = int32(pos[particle_id, 0] / cell_size)
-        cell_y = int32(pos[particle_id, 1] / cell_size)
-        
-        grid_indices[particle_id] = cell_y * grid_dim + cell_x
-
 @njit(parallel=True, cache=True)
-def update_particles_kernel_cpu(positions, velocities, types, N, R_min, R_max, matrix, friction, dt, map_size, 
-                                grid_pos, grid_counts, cell_size, grid_dim):
-
-    # We calculate the 'real' max distance once to check
-    # Normally you would check if sqrt(dis * dis) < sqrt(max_dis) but
-    # sqrt is a heavy operation and redundant
+def update_particles(
+    positions, velocities, types, N, R_min, R_max, matrix, 
+    friction, dt, map_size, grid_pos, grid_counts, cell_size, grid_dim
+):
+    # Main simulation step: Spatial hashing lookup + Force accumulation + Integration
     
+    # Boundary threshold for wrapping logic
+    half_map = map_size / 2.0
+    max_dist_sq = R_max * R_max + 1.0
 
-    # loop over each particle
-    for particle_id in prange(N):
-        
-        f_x = 0.0
-        f_y = 0.0
-        
-        pos_x = positions[particle_id, 0]
-        pos_y = positions[particle_id, 1]
+    for i in prange(N):
+        f_x, f_y = 0.0, 0.0
+        pos_x, pos_y = positions[i]
+        p_type = types[i]
 
-        particle_type = types[particle_id]
-
+        # Determine current cell coordinates
         cell_x = int32(pos_x / cell_size)
         cell_y = int32(pos_y / cell_size)
         
-        # loop over all cells in a 3x3 neighborhood
-        for i in range(-1, 2):
-           
-
-            for i2 in range(-1, 2):
-                neighbor_cell_x = cell_x + i
-                neighbor_cell_x = neighbor_cell_x % grid_dim
-
-                neighbor_cell_y = cell_y + i2
-                neighbor_cell_y = neighbor_cell_y % grid_dim
+        # Search the 3x3 neighborhood of cells
+        for dx in range(-1, 2):
+            for dy in range(-1, 2):
+                # Wrapped grid coordinates
+                nx = (cell_x + dx) % grid_dim
+                ny = (cell_y + dy) % grid_dim
                 
-                cell_id = neighbor_cell_y * grid_dim + neighbor_cell_x
-                
-                start_i = grid_pos[cell_id]
-                end_i = start_i + grid_counts[cell_id]
+                cell_id = ny * grid_dim + nx
+                start_idx = grid_pos[cell_id]
+                end_idx = start_idx + grid_counts[cell_id]
 
-               
-                for i3 in range(start_i, end_i):
-                    # Check if particle interact with itself
-                    if particle_id == i3: 
+                # Check particles within the cell
+                for i2 in range(start_idx, end_idx):
+                    if i == i2: 
                         continue
 
-                    pos_x_2, pos_y_2 = positions[i3, 0], positions[i3, 1]
-                    type_2 = types[i3]
+                    #  Relative vector
+                    dx_val = positions[i2, 0] - pos_x
+                    dy_val = positions[i2, 1] - pos_y
 
-                    d_x = pos_x_2 - pos_x
-                    d_y = pos_y_2 - pos_y
+                    # Toroidal distance correction
+                    if dx_val > half_map:     dx_val -= map_size 
+                    elif dx_val < -half_map:  dx_val += map_size 
+                    if dy_val > half_map:     dy_val -= map_size 
+                    elif dy_val < -half_map:  dy_val += map_size 
+
+                    dist_sq = dx_val**2 + dy_val**2
                     
-                    # On edges we still calculate neighbors using wrapping
-                    # boundaries. To actually get the correct distance we subtract
-                    # or add the map_size
-                    if d_x > map_size / 2.0:
-                        d_x -= map_size 
-                    elif d_x < -map_size / 2.0:
-                        d_x += map_size 
-                    if d_y > map_size / 2.0:
-                        d_y -= map_size 
-                    elif d_y < -map_size / 2.0:
-                        d_y += map_size 
-                    # Calculate the distance squared
-                    dist = d_x*d_x + d_y*d_y
-                    
-                    # If outside MAX_ATTRACTION_RADIUS, skip
-                    if dist > R_max * R_max + 1:
+                    if dist_sq > max_dist_sq or dist_sq < 1e-9:
                         continue
 
-                    # Get the actual distance for the correct force calculations
-                    dist = np.sqrt(dist)
-                   
-                    # Get the type of relation between two types
-                    interaction = matrix[type_2, particle_type]
-
-                    # Calculate the magnitude of the force
+                    dist = np.sqrt(dist_sq)
+                    interaction = matrix[types[i2], p_type]
                     force = calculate_force(dist, R_min, R_max, interaction)
 
-                    # We apply the force in the right direction
-                    if dist > 1e-6: 
-                        f_x += force * (d_x / dist) # <- normalized 
-                        f_y += force * (d_y / dist) # <- normalized
+                    # Accumulate normalized force vectors
+                    f_x += force * (dx_val / dist)
+                    f_y += force * (dy_val / dist)
 
-       
-        # We update the velocities using euler intergrations and our found force
-        # We also apply friction to take energy out of the system
-        velocities[particle_id, 0] = (velocities[particle_id, 0] + f_x * dt) * friction
-        velocities[particle_id, 1] = (velocities[particle_id, 1] + f_y * dt) * friction
+      
+        vx = (velocities[i, 0] + f_x * dt) * friction
+        vy = (velocities[i, 1] + f_y * dt) * friction
 
-        # Stablize the simulation though max speed
-        vx = velocities[particle_id, 0]
-        vy = velocities[particle_id, 1]
-        current_speed_sq = vx*vx + vy*vy
-        max_speed = 10
-        if current_speed_sq > max_speed * max_speed:
-            current_speed = np.sqrt(current_speed_sq)
-            scale_factor = max_speed / current_speed
-            velocities[particle_id, 0] *= scale_factor
-            velocities[particle_id, 1] *= scale_factor
+        # Limit speeed
+        max_speed = 10.0
+        speed_sq = vx**2 + vy**2
+        if speed_sq > max_speed**2:
+            scale = max_speed / np.sqrt(speed_sq)
+            vx *= scale
+            vy *= scale
 
-        # Update the positons and apply wrapping though the '%' operator
-        positions[particle_id, 0] += velocities[particle_id, 0] * dt
-        positions[particle_id, 1] += velocities[particle_id, 1] * dt
+        velocities[i, 0], velocities[i, 1] = vx, vy
 
-        positions[particle_id, 0] = positions[particle_id, 0] % map_size
-        positions[particle_id, 1] = positions[particle_id, 1] % map_size
+        # Update position with tordial wrapping
+        positions[i, 0] = (pos_x + vx * dt) % map_size
+        positions[i, 1] = (pos_y + vy * dt) % map_size
+
+
+
+@njit(cache=True)
+def map_particles_to_cells(pos, N, cell_size, grid_dim, grid_indices):
+    # Maps all particle indices to their corresponding  grid index
+    for i in range(N):
+        cx = int32(pos[i, 0] / cell_size)
+        cy = int32(pos[i, 1] / cell_size)
+        grid_indices[i] = cy * grid_dim + cx
 
 
 class ParticleManager:
-    
-    
-    def __init__(self, particle_count, map_size, num_types, min_r, max_r, cell_size, friction, dt, interaction_matrix):
-        self.particle_count = particle_count
-        self.num_types = num_types
-        self.map_size = map_size
-        
-        # These influence the simulation
-        self.R_min = min_r
-        self.R_max = max_r
-        self.friction = friction  
-        self.dt = dt   
-        self.matrix = interaction_matrix.astype(np.float64)
+    def __init__(self, **kwargs):
+        # Configure all variables
+        self.particle_count = kwargs.get('particle_count')
+        self.num_types      = kwargs.get('num_types')
+        self.map_size       = kwargs.get('map_size')
+        self.R_min          = kwargs.get('min_r')
+        self.R_max          = kwargs.get('max_r')
+        self.friction       = kwargs.get('friction')
+        self.dt             = kwargs.get('dt')
+        self.matrix         = kwargs.get('interaction_matrix').astype(np.float64)
 
-        # Spatial information
-        self.cell_size = cell_size
-        self.GRID_DIM = map_size // cell_size + 1
-        self.GRID_SIZE = self.GRID_DIM * self.GRID_DIM
+        # Spatial grid
+        self.cell_size = kwargs.get('cell_size')
+        self.GRID_DIM  = self.map_size // self.cell_size + 1
+        self.GRID_SIZE = self.GRID_DIM ** 2
         
-        # Initialize the position, velocity and types array (last one at random)
-        self.pos = np.random.uniform(0, map_size, size=(self.particle_count, 2)).astype(np.float64)
-        self.vel = np.zeros((self.particle_count, 2), dtype=np.float64)
-        self.types = np.random.randint(0, num_types, size=self.particle_count, dtype=np.int32)
+        # Particle state arrays
+        self.pos   = np.random.uniform(0, self.map_size, (self.particle_count, 2)).astype(np.float64)
+        self.vel   = np.zeros((self.particle_count, 2), dtype=np.float64)
+        self.types = np.random.randint(0, self.num_types, self.particle_count, dtype=np.int32)
         
-        # Maps particles to which grid cell their in
+        # Spatial grid buffers
         self.grid_indices = np.zeros(self.particle_count, dtype=np.int32)
-
-        # The amount of particles in each cell
-        self.grid_counts = np.zeros(self.GRID_SIZE, dtype=np.int32) 
-
-        # The start position of all cells in the sorted array
-        self.grid_pos = np.zeros(self.GRID_SIZE, dtype=np.int32)  
+        self.grid_counts  = np.zeros(self.GRID_SIZE, dtype=np.int32) 
+        self.grid_pos     = np.zeros(self.GRID_SIZE, dtype=np.int32)  
 
     def update_grid(self):
-       
-        # We map the particles to there corresponding cells
-        map_particles_to_cells(
-            self.pos, self.particle_count, self.cell_size, self.GRID_DIM, self.grid_indices
-        )
+        # Reorders particles by grid cell
+        map_particles_to_cells(self.pos, self.particle_count, self.cell_size, self.GRID_DIM, self.grid_indices)
         
-        # We use np.argsort. This doesn't return the sorted array but
-        # the INDICES that would sort the array. So all id's with cell index
-        # 0 start in this array, cell index 1 after that, etc.
+        # Sort indices to group particles by cell
         sorted_indices = np.argsort(self.grid_indices)
         
-        # We need to reorder our all ready initialized arrays using our
-        # new indices
+        # Reorder all simulation arrays
         self.pos = self.pos[sorted_indices]
         self.vel = self.vel[sorted_indices]
         self.types = self.types[sorted_indices]
         self.grid_indices = self.grid_indices[sorted_indices]
         
-        # Initialize all elements in the grid_counts and grid_pos to 0
+       
         self.grid_counts[:] = 0
         self.grid_pos[:] = 0
         
-        # We use np.unique to count to retrieve all cells which contain particles
-        # and their counts (amount of particles)
         unique_cells, counts = np.unique(self.grid_indices, return_counts=True)
-        # Use the unique_cells (array) as indices and map to them the particle counts
         self.grid_counts[unique_cells] = counts
         
-        # We use cumsum to set the correct starting positions for each cells
-        # If we have the particle counts: [ 5, 10, 3, 7, ...] 
-        # We get the corresponding starting positions: np.cumsum(self.grid_counts) -> [5, 15, 18, 25, ...] 
+        # Calculate offsets for each cell
         self.grid_pos[1:] = np.cumsum(self.grid_counts)[:-1]
 
     def update(self):
-    
-        # This one one simulation step
+        # Update the whole simulation for one frame
 
-        # We update the spatial grid. This takes compute time but makes
-        # the main loop magnitudes faster
+        # Initialize the grid
         self.update_grid()
         
-        # We run the main physics kernel on the CPU using parallelized Numba
-        update_particles_kernel_cpu(
+        # Compute the physics
+        update_particles(
             self.pos, self.vel, self.types, self.particle_count, 
             self.R_min, self.R_max, self.matrix, self.friction, self.dt, self.map_size,
             self.grid_pos, self.grid_counts, self.cell_size, self.GRID_DIM
