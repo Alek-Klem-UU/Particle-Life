@@ -27,7 +27,7 @@ def calculate_force(dist, R_min, R_max, alpha):
 @njit(parallel=True, cache=True)
 def update_particles(
     positions, velocities, types, N, R_min, R_max, matrix, 
-    friction, dt, map_size, grid_pos, grid_counts, cell_size, grid_dim
+    friction, dt, max_speed, map_size, grid_pos, grid_counts, cell_size, grid_dim
 ):
     # Main simulation step: Spatial hashing lookup + Force accumulation + Integration
     
@@ -87,8 +87,8 @@ def update_particles(
         vx = (velocities[i, 0] + f_x * dt) * friction
         vy = (velocities[i, 1] + f_y * dt) * friction
 
-        # Limit speeed
-        max_speed = 10.0
+        # Limit speeed 
+       
         speed_sq = vx**2 + vy**2
         if speed_sq > max_speed**2:
             scale = max_speed / np.sqrt(speed_sq)
@@ -122,6 +122,7 @@ class ParticleManager:
         self.R_max          = kwargs.get('max_r')
         self.friction       = kwargs.get('friction')
         self.dt             = kwargs.get('dt')
+        self.max_speed      = kwargs.get('max_speed')
         self.matrix         = kwargs.get('interaction_matrix').astype(np.float64)
 
         # Spatial grid
@@ -171,7 +172,7 @@ class ParticleManager:
         # Compute the physics
         update_particles(
             self.pos, self.vel, self.types, self.particle_count, 
-            self.R_min, self.R_max, self.matrix, self.friction, self.dt, self.map_size,
+            self.R_min, self.R_max, self.matrix, self.friction, self.dt, self.max_speed, self.map_size,
             self.grid_pos, self.grid_counts, self.cell_size, self.GRID_DIM
         )
         

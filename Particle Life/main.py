@@ -6,7 +6,9 @@ PARTICLE_COUNT         = 20000
 NUMBER_OF_TYPES        = 6
 INITIAL_SEED           = 42
 FRICTION               = 0.4
+MAX_SPEED              = 100
 DELTA_TIME             = 0.1
+
 
 # Spatial variables
 MAP_SIZE               = 400
@@ -38,6 +40,7 @@ def main():
         "initial_seed":      INITIAL_SEED,
         "friction":          FRICTION,
         "delta_time":        DELTA_TIME,
+        "max_speed":         MAX_SPEED,
         "buffer_clear":      BUFFER_CLEAR
     }
 

@@ -1,3 +1,4 @@
+from numba.misc.appdirs import unicode
 import pygame
 import numpy as np
 import random
@@ -35,6 +36,7 @@ class Simulation:
         self.cell_size      = cfg.get('cell_size')
         self.friction       = cfg.get('friction')
         self.delta_time     = cfg.get('delta_time')
+        self.max_speed      = cfg.get('max_speed')
         self.sidebar_width  = cfg.get('sidebar_width')
         self.screen_size    = (cfg.get('screen_width'), cfg.get('screen_height'))
         self.num_types      = cfg.get('initial_num_types')
@@ -80,7 +82,8 @@ class Simulation:
             cell_size=self.cell_size,
             interaction_matrix=self.interaction_matrix,
             friction=self.friction,
-            dt=self.delta_time
+            dt=self.delta_time,
+            max_speed=self.max_speed
         )
 
         # Clear the buffer to remove previous coloured pixels
