@@ -3,7 +3,7 @@ import pygame
 import numpy as np
 import random
 from particleManager import ParticleManager
-from visualization import draw_simulation, draw_matrix, draw_ui
+from visualization import *
 
 class Simulation:
     def __init__(self, **kwargs):
@@ -18,7 +18,12 @@ class Simulation:
         self.ui_rects = {}
         self.interaction_matrix = None
         self.manager = None
+        self.fancy = False
+        self.time_steps = 0
+        self.checks = []
+        self.cached_graph = None
         
+
         # Pygame setup
         pygame.init()
         self.screen = pygame.display.set_mode(self.screen_size)
@@ -47,8 +52,9 @@ class Simulation:
         """Initializes all surfaces, buffers, and color palettes."""
         self.BG_COLOR = (0, 0, 0)
         self.pixel_buffer = np.zeros((self.map_size, self.map_size, 3), dtype=np.uint8)
-        self.particle_surface = pygame.Surface((self.map_size, self.map_size), depth=24)
-        
+
+        self.particle_surface = pygame.Surface((self.map_size * 2, self.map_size * 2), depth=24)
+      
         self.colors = [
             (251, 150, 72), (255, 255, 255), (250, 251, 255),
             (173, 198, 223), (170, 210, 160), (212, 0, 30),
@@ -67,6 +73,9 @@ class Simulation:
             seed_val = random.randint(0, 99999)
             self.current_seed = str(seed_val)
         
+        self.time_steps = 0
+        self.checks = []
+
         np.random.seed(seed_val)
         random.seed(seed_val)
         
@@ -127,6 +136,30 @@ class Simulation:
         if self.ui_rects.get('rerun', pygame.Rect(0,0,0,0)).collidepoint(mx, my):
             self.restart_simulation()
 
+        if self.ui_rects.get('seed_1', pygame.Rect(0,0,0,0)).collidepoint(mx, my):
+            self.current_seed = "42"
+            self.num_types = 3
+            self.restart_simulation()
+
+        if self.ui_rects.get('seed_2', pygame.Rect(0,0,0,0)).collidepoint(mx, my):
+            self.current_seed = "666"
+            self.num_types = 4
+            self.restart_simulation()
+
+        if self.ui_rects.get('seed_3', pygame.Rect(0,0,0,0)).collidepoint(mx, my):
+            self.current_seed = "9"
+            self.num_types = 10
+            self.restart_simulation()
+
+        if self.ui_rects.get('seed_4', pygame.Rect(0,0,0,0)).collidepoint(mx, my):
+            self.current_seed = "103"
+            self.num_types = 2
+            self.restart_simulation()
+
+        if self.ui_rects.get('fancy', pygame.Rect(0,0,0,0)).collidepoint(mx, my):
+            self.fancy = not self.fancy
+
+
     def on_keypress(self, event):
 
          # A function to handle all keyboard inputs. 
@@ -153,8 +186,10 @@ class Simulation:
             self.handle_events()
             
             # Update particles
-            positions, types = self.manager.update()
-            
+            positions, types, checks = self.manager.update()
+            self.checks.append(checks)
+            self.time_steps += 1
+
             # Render a new frame
             self.render_frame(positions, types)
             
@@ -175,7 +210,7 @@ class Simulation:
         draw_simulation(
             self.screen, self.particle_surface, self.pixel_buffer,
             positions, types, self.colors, self.map_size,
-            self.buffer_clear, self.BG_COLOR
+            self.buffer_clear, self.fancy, self.BG_COLOR
         )
         
         # 2. UI Panel
@@ -184,11 +219,27 @@ class Simulation:
             self.current_seed, self.input_active, self.num_types,
             self.buffer_clear
         )
+
+        self.ui_rects = self.ui_rects | draw_ui_2(
+            self.screen, self.map_size, self.sidebar_width, self.fancy
+        )
+      
         
         # 3. Interaction Matrix
         draw_matrix(
             self.screen, self.interaction_matrix, self.map_size, 
             self.sidebar_width, self.colors, matrix_y
         )
-        
+
+        # Draw the graph every 250 frames
+        if (self.time_steps % 250 == 10):
+            self.cached_graph = draw_graph(
+                self.screen, self.checks, self.time_steps,
+                self.map_size, 400
+            )
+        elif self.cached_graph != None:
+            graph_x = self.map_size * 2 + 25
+            graph_y = 400
+            self.screen.blit(self.cached_graph, (graph_x, graph_y))
+
         pygame.display.flip()

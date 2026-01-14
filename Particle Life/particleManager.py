@@ -30,8 +30,10 @@ def update_particles(
     friction, dt, max_speed, map_size, grid_pos, grid_counts, cell_size, grid_dim
 ):
     # Main simulation step: Spatial hashing lookup + Force accumulation + Integration
-    
     # Boundary threshold for wrapping logic
+
+    checks = 0
+
     half_map = map_size / 2.0
     max_dist_sq = R_max * R_max + 1.0
 
@@ -57,6 +59,7 @@ def update_particles(
 
                 # Check particles within the cell
                 for i2 in range(start_idx, end_idx):
+                    checks += 1
                     if i == i2: 
                         continue
 
@@ -100,7 +103,7 @@ def update_particles(
         # Update position with tordial wrapping
         positions[i, 0] = (pos_x + vx * dt) % map_size
         positions[i, 1] = (pos_y + vy * dt) % map_size
-
+    return checks
 
 
 @njit(cache=True)
@@ -170,10 +173,11 @@ class ParticleManager:
         self.update_grid()
         
         # Compute the physics
-        update_particles(
+        checks = update_particles(
             self.pos, self.vel, self.types, self.particle_count, 
             self.R_min, self.R_max, self.matrix, self.friction, self.dt, self.max_speed, self.map_size,
             self.grid_pos, self.grid_counts, self.cell_size, self.GRID_DIM
         )
-        
-        return self.pos, self.types
+       
+
+        return self.pos, self.types, checks

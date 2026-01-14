@@ -2,24 +2,24 @@ import numpy as np
 from simulation import Simulation
 
 # Simulation related variables
-PARTICLE_COUNT         = 20000
+PARTICLE_COUNT         = 17000
 NUMBER_OF_TYPES        = 6
 INITIAL_SEED           = 42
 FRICTION               = 0.4
-MAX_SPEED              = 100
+MAX_SPEED              = 1000
 DELTA_TIME             = 0.1
 
 
-# Spatial variables
-MAP_SIZE               = 400
+# Spatial variables - (KEEP MAP SIZE 300)
+MAP_SIZE               = 300
 MIN_ATTRACTION_RADIUS  = 3
 MAX_ATTRACTION_RADIUS  = 20
 CELL_SIZE              = MAX_ATTRACTION_RADIUS 
 
 # Display setting (DO NOT CHANGE)
-SIDEBAR_WIDTH          = 300 
-TOTAL_SCREEN_WIDTH     = MAP_SIZE + SIDEBAR_WIDTH
-TOTAL_SCREEN_HEIGHT    = MAP_SIZE
+SIDEBAR_WIDTH          = 500 
+TOTAL_SCREEN_WIDTH     = MAP_SIZE * 2 + SIDEBAR_WIDTH
+TOTAL_SCREEN_HEIGHT    = MAP_SIZE * 2
 BUFFER_CLEAR           = True
 
 def main():
