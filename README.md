@@ -15,9 +15,10 @@ Unlike standard implementations that run in $O(n^2)$ time, this simulation utili
 * **Emergent Behavior:** Observe self-organizing structures based on simple attraction/repulsion matrices.
 * **Interactive UI:** Adjust parameters using an interactive UI
 * **Periodic Boundaries:** The world wraps around (toroidal topology) to prevent edge clumping.
+* **Live Plot Data:** Keep track of performance live.
+* **Cool Seed Options:** Four seeds which are cool in my opinion.
 
-<img width="873" height="534" alt="Screenshot 2026-01-12 115641" src="https://github.com/user-attachments/assets/2e1f6dcc-637d-4960-b905-04c65b7a3373" />
-
+<img width="1093" height="601" alt="Screenshot 2026-01-14 135100" src="https://github.com/user-attachments/assets/14e10f3e-31c6-46ec-bf89-5a72cca5b199" />
 
 ## Installation
 
