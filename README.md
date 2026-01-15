@@ -4,6 +4,8 @@ A high performance Python simulation of artificial life using particles and simp
 
 <img width="492" height="493" alt="Screenshot 2026-01-06 170456" src="https://github.com/user-attachments/assets/50c519e4-207d-45ac-bbd0-a3988ef93054" />
 <img width="499" height="500" alt="Screenshot 2026-01-12 125238" src="https://github.com/user-attachments/assets/d27eebd4-7161-4630-a277-b5afcdfeb9a5" />
+<img width="593" height="599" alt="image" src="https://github.com/user-attachments/assets/d77a3bf9-b57e-47b7-80e4-ff0dc0a6ea9d" />
+
 
 ## Project Overview
 This project explores **emergence**: how complex, life like structures can arise from simple local interaction rules. 
