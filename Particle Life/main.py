@@ -10,8 +10,8 @@ MAX_SPEED              = 1000
 DELTA_TIME             = 0.1
 
 
-# Spatial variables - (KEEP MAP SIZE 300)
-MAP_SIZE               = 300
+# Spatial variables - (KEEP MAP SIZE 300 (or not and maybe mess up the UI))
+MAP_SIZE               = 400
 MIN_ATTRACTION_RADIUS  = 3
 MAX_ATTRACTION_RADIUS  = 20
 CELL_SIZE              = MAX_ATTRACTION_RADIUS 

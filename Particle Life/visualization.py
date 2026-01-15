@@ -268,12 +268,10 @@ def draw_simulation(screen, surface, pixel_buffer, positions, types, colors, map
         screen.blit(surface, (0, 0))
 
     
-def draw_graph(screen, checks, time_step, map_size, y_pos):
+def draw_graph(screen, checks, time_step, map_size, y_pos, width=450, height=200):
 
     x_pos = map_size * 2 + 25
-    width=450
-    height=200
-
+   
     if len(checks) < 2:
         return 
 
