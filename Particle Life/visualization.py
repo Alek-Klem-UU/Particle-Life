@@ -255,7 +255,9 @@ def draw_simulation(screen, surface, pixel_buffer, positions, types, colors, map
     if fancy:
         glow_small = cv2.GaussianBlur(pixel_buffer, (55, 55), 1)
         glow_f = glow_small.astype(np.float32) / 255.0
+        # Increase glow fall off and intensity with the constant value
         dense_glow_f = np.power(glow_f, 2.13) * 4
+        # Clip it again to be in the range (0, 255)
         dense_glow_final = np.clip(dense_glow_f * 255, 0, 255).astype(np.uint8)
 
         upscaled_glow = cv2.resize(dense_glow_final, (map_size * 2, map_size * 2), interpolation=cv2.INTER_CUBIC)
